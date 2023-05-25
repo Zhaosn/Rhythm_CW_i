@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CW Trainer</title>
+</head>
+<body>
+  <h1>CW Trainer</h1>
+  <p>Press and hold any key to play a 440Hz sine wave.</p>
+
+  <script>
+    // Create an audio context
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    // Create an oscillator node
+    const oscillator = audioCtx.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 440; // Set the frequency to 440Hz
+
+    // Connect the oscillator to the audio output
+    oscillator.connect(audioCtx.destination);
+
+    // Function to start the oscillator
+    function startOscillator() {
+      oscillator.start();
+    }
+
+    // Function to stop the oscillator
+    function stopOscillator() {
+      oscillator.stop();
+    }
+
+    // Event listener for key press
+    document.addEventListener('keydown', () => {
+      startOscillator();
+    });
+
+    // Event listener for key release
+    document.addEventListener('keyup', () => {
+      stopOscillator();
+    });
+  </script>
+</body>
+</html>

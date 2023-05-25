@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Morse Code Decoder</title>
+</head>
+<body>
+  <label for="morseInput">Enter Morse Code:</label>
+  <input type="text" id="morseInput" oninput="decodeMorseCode()">
+
+  <p id="decodedOutput"></p>
+
+  <script>
+    const morseCodeMap = {
+      '.-': 'A', '-...': 'B', '-.-.': 'C', '-..': 'D', '.': 'E',
+      '..-.': 'F', '--.': 'G', '....': 'H', '..': 'I', '.---': 'J',
+      '-.-': 'K', '.-..': 'L', '--': 'M', '-.': 'N', '---': 'O',
+      '.--.': 'P', '--.-': 'Q', '.-.': 'R', '...': 'S', '-': 'T',
+      '..-': 'U', '...-': 'V', '.--': 'W', '-..-': 'X', '-.--': 'Y',
+      '--..': 'Z', '.----': '1', '..---': '2', '...--': '3', '....-': '4',
+      '.....': '5', '-....': '6', '--...': '7', '---..': '8', '----.': '9',
+      '-----': '0', '': ' '
+    };
+
+    function decodeMorseCode() {
+      const morseInput = document.getElementById('morseInput').value.trim();
+      const decodedOutput = document.getElementById('decodedOutput');
+
+      if (morseInput === '') {
+        decodedOutput.textContent = '';
+        return;
+      }
+
+      const words = morseInput.split(' / ');
+      const decodedText = words
+        .map(word => {
+          const characters = word.split(' ');
+          const decodedWord = characters
+            .map(character => morseCodeMap[character] || '?')
+            .join('');
+          return decodedWord;
+        })
+        .join(' ');
+
+      decodedOutput.textContent = '';
+
+      let index = 0;
+      const interval = setInterval(() => {
+        if (index >= decodedText.length) {
+          clearInterval(interval);
+          return;
+        }
+
+        decodedOutput.textContent += decodedText[index++];
+      }, 100);
+    }
+  </script>
+</body>
+</html>

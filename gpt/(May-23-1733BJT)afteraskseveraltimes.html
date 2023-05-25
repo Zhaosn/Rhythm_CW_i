@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CW Trainer</title>
+</head>
+<body>
+  <h1>CW Trainer</h1>
+  <p>Press and hold any key or click the mouse to play a 440Hz sine wave.</p>
+  <p>Enter "cheat code" below to toggle between press key and press mouse:</p>
+  <input type="text" id="cheatCodeInput" placeholder="Enter cheat code" />
+
+  <script>
+    // Create an audio context
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    // Variables to hold the current oscillator and gain nodes
+    let oscillator = null;
+    let gainNode = null;
+
+    // Function to create and start the oscillator
+    function startOscillator() {
+      // Create a new oscillator
+      oscillator = audioCtx.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 440; // Set the frequency to 440Hz
+
+      // Create a gain node to control the volume
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = 0.5; // Set the volume to 50%
+
+      // Connect the oscillator to the gain node and the gain node to the audio output
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      // Start the oscillator
+      oscillator.start();
+    }
+
+    // Function to stop the oscillator
+    function stopOscillator() {
+      if (oscillator) {
+        oscillator.stop();
+        oscillator.disconnect();
+        gainNode.disconnect();
+        oscillator = null;
+        gainNode = null;
+      }
+    }
+
+    // Flag to track the current mode (press key or press mouse)
+    let isKeyPressMode = true;
+
+    // Flag to track the current state of key press or mouse click
+    let isKeyPressed = false;
+
+    // Function to toggle between press key and press mouse modes
+    function toggleMode() {
+      isKeyPressMode = !isKeyPressMode;
+    }
+
+    // Event listener for key press
+    document.addEventListener('keydown', (event) => {
+      if (isKeyPressMode) {
+        if (!isKeyPressed) {
+          startOscillator();
+        }
+        isKeyPressed = true;
+      }
+    });
+
+    // Event listener for key release
+    document.addEventListener('keyup', () => {
+      if (isKeyPressMode) {
+        stopOscillator();
+        isKeyPressed = false;
+      }
+    });
+
+    // Event listener for mouse click
+    document.addEventListener('mousedown', () => {
+      if (!isKeyPressMode) {
+        if (!isKeyPressed) {
+          startOscillator();
+        }
+        isKeyPressed = true;
+      }
+    });
+
+    // Event listener for mouse release
+    document.addEventListener('mouseup', () => {
+      if (!isKeyPressMode) {
+        stopOscillator();
+        isKeyPressed = false;
+      }
+    });
+
+    // Event listener for cheat code input
+    const cheatCodeInput = document.getElementById('cheatCodeInput');
+    cheatCodeInput.addEventListener('keyup', (event) => {
+      if (event.key === 'Enter' && cheatCodeInput.value.toLowerCase() === 'cheat code') {
+        toggleMode();
+        cheatCodeInput.value = '';
+        cheatCodeInput.placeholder = `Mode switched. Current mode: ${isKeyPressMode ? 'Press Key' : 'Press Mouse'}`;
+      }
+    });
+  </script>
+</body>
+</html>

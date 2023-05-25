@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+  <title>RhythmCW!(ChatGPT & BH3FZJ)</title>
+  <style>
+    #waterfallContainer {
+      position: relative;
+      width: 1500px;
+      height: 300px;
+      border: 1px solid #ccc;
+      overflow: hidden;
+    }
+
+    .waterfallElement {
+      position: absolute;
+      width: 10%;
+      height: 5%;
+      background-color: #0066ff;
+      opacity: 0.7;
+      animation: waterfallAnimation linear 1;
+    }
+    .waterfallGapElement {
+      position: absolute;
+      width: 2px;
+      height: 5%;
+      background-color: #0066ff;
+      opacity: 0.7;
+      animation: waterfallGapAnimation linear 1;
+    }
+    .waterfallTickConditionElement {
+      position: absolute;
+      width: 5px;
+      height: 10%;
+      background-color: #817f26;
+      opacity: 0.2;
+      animation: waterfallTickConditionAnimation linear 1;
+    }
+    .color-lump{
+      display: inline-block;
+      width: 15px;
+      height: 15px;
+      background-color: #CC3300;
+    }
+
+/*    @keyframes waterfallAnimation {
+      0% {
+        top: 0;
+      }
+      100% {
+        top: 100%;
+      }
+    }*/
+    @keyframes waterfallAnimation {
+      0% {
+        right: 0;
+      }
+      100% {
+        right: 100%;
+      }
+    }
+    @keyframes waterfallGapAnimation {
+      0% {
+        right: 0;
+      }
+      100% {
+        right: 100%;
+      }
+    }
+    @keyframes waterfallTickConditionAnimation {
+      0% {
+        top: 5%;
+        right: 0;
+      }
+      100% {
+        top: 5%;
+        right: 100%;
+      }
+    }
+
+  </style>
+</head>
+<body>
+  <h1>CW Trainer</h1>
+  <p>Press and hold any key or click the mouse to play a 440Hz sine wave.</p>
+<!--  <p>Enter "cheat code" below to toggle between press key and press mouse:</p>
+  <input type="text" id="cheatCodeInput" placeholder="Enter cheat code" />-->
+  <label for="flagCheckbox">键盘输入:</label>
+  <input type="checkbox" id="flagCheckboxKey" checked onchange="toggleKeyIn()">
+  <p>Press Duration: <span id="pressDuration">0</span>ms</p>
+  <label for="flagCheckbox">不正常的瀑布图:</label>
+  <input type="checkbox" id="flagCheckbox" onchange="toggleFlag()">
+  <p>划: <span id="pressLong">0</span>ms</p>
+  <p>点: <span id="pressShort">0</span>ms</p>
+  <p>点划比: <span id="ratio">0</span>%</p>
+  <p>间隔比点: <span id="gapRatio">0</span>%; 超过170%: <span id="gapRatioTemp">0</span>%</p>
+  <p id="decodedOutput"></p>
+  <div>
+    点划判定点锁定
+    <span class="color-lump"></span>
+    <span id="threshold">0</span>ms
+    <button type="button" onclick="cleanBuffer()">清空解码</button>
+  </div>
+  <div id="waterfallContainer"></div>
+  <p>'.-': 'A', '-...': 'B', '-.-.': 'C', '-..': 'D', '.': 'E',
+      '..-.': 'F', '--.': 'G', '....': 'H', '..': 'I', '.---': 'J',
+      '-.-': 'K', '.-..': 'L', '--': 'M', '-.': 'N', '---': 'O',
+      '.--.': 'P', '--.-': 'Q', '.-.': 'R', '...': 'S', '-': 'T',
+      '..-': 'U', '...-': 'V', '.--': 'W', '-..-': 'X', '-.--': 'Y',
+      '--..': 'Z', '.----': '1', '..---': '2', '...--': '3', '....-': '4',
+      '.....': '5', '-....': '6', '--...': '7', '---..': '8', '----.': '9',
+      '-----': '0'</br>
+      其实这个瀑布图一开始是想做竖着的，后来改成横向运动后没改元素的CSS，觉得这个效果挺新鲜就保留了。</br>时间长短是几次输入平均结果</br>怎么算出字之间的大间隔？</br>
+  《业余无线电通信》(第四版)72页说小间隔是无间隔3个点，大间隔是5个</br>
+  间隔我新增了一个竖条，现在需要想一个算法能将"最长的间隔后的信号"当作新的字母
+  </br>我的面向对象能力很差，代码模块化很低，有的变量前面声明后面到处调用：我将超时分割字符的功能没有和其他解码功能放在了一起，而是作为类似抬起按键后的看门狗放在了那里</p>
+  <script>
+
+    ////////////////////////////////////////////////
+    // MAKE SOME NOISE
+    ////////////////////////////////////////////////
+
+    // Create an audio context
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    // Variables to hold the current oscillator and gain nodes
+    let oscillator = null;
+    let gainNode = null;
+
+    // Function to create and start the oscillator
+    function startOscillator() {
+      // Create a new oscillator
+      oscillator = audioCtx.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 440; // Set the frequency to 440Hz
+
+      // Create a gain node to control the volume
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = 0.1; // Set the volume to 20%
+
+      // Connect the oscillator to the gain node and the gain node to the audio output
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      // Start the oscillator
+      oscillator.start();
+    }
+
+    // Function to stop the oscillator
+    function stopOscillator() {
+      if (oscillator) {
+        oscillator.stop();
+        oscillator.disconnect();
+        gainNode.disconnect();
+        oscillator = null;
+        gainNode = null;
+      }
+    }
+
+    // Flag to track the current mode (press key or press mouse)
+    let isKeyPressMode = true;
+
+    // Flag to track the current state of key press or mouse click
+    let isKeyPressed = false;
+
+    // Variable to store the flag value
+    let isNormFall = false;
+
+    // Function to toggle the flag variable
+    function toggleFlag() {
+      isNormFall = document.getElementById('flagCheckbox').checked;
+      // console.log('Flag value:', isNormFall);
+    }
+
+    function toggleKeyIn() {
+      isKeyPressMode = document.getElementById('flagCheckboxKey').checked;
+      // console.log('Flag value:', isNormFall);
+    }
+
+    // Function to toggle between press key and press mouse modes
+    function toggleMode() {
+      isKeyPressMode = !isKeyPressMode;
+    }
+
+    ////////////////////////////////////////////////
+    // START ADDING ELEMENT
+    ////////////////////////////////////////////////
+
+    // Function to create a waterfall element
+    function createWaterfallElement() {
+      const waterfallElement = document.createElement('div');
+      waterfallElement.className = 'waterfallElement';
+      return waterfallElement;
+    }
+
+    // Function to add a new waterfall element
+    function addWaterfallElement() {
+        const waterfallContainer = document.getElementById('waterfallContainer');
+        const waterfallElement = createWaterfallElement();
+        waterfallContainer.appendChild(waterfallElement);
+
+        // Remove the waterfallElement after the animation ends
+        waterfallElement.addEventListener('animationend', () => {
+            waterfallElement.remove();
+        });
+
+        return waterfallElement;
+    }
+
+    // Function to create a waterfall element
+    function createWaterfallGapElement() {
+      const waterfallGapElement = document.createElement('div');
+      waterfallGapElement.className = 'waterfallGapElement';
+      return waterfallGapElement;
+    }
+
+    // Function to add a new waterfall element
+    function addWaterfallGapElement() {
+        const waterfallContainer = document.getElementById('waterfallContainer');
+        const waterfallGapElement = createWaterfallGapElement();
+        waterfallContainer.appendChild(waterfallGapElement);
+
+        // Remove the waterfallGapElement after the animation ends
+        waterfallGapElement.addEventListener('animationend', () => {
+            waterfallGapElement.remove();
+        });
+
+        return waterfallGapElement;
+    }
+
+    // Function to create a waterfall element
+    function createWaterfallTickConditionElement() {
+      const waterfallTickConditionElement = document.createElement('div');
+      waterfallTickConditionElement.className = 'waterfallTickConditionElement';
+      return waterfallTickConditionElement;
+    }
+
+    // Function to add a new waterfall element
+    function addWaterfallTickConditionElement() {
+        const waterfallContainer = document.getElementById('waterfallContainer');
+        const waterfallTickConditionElement = createWaterfallTickConditionElement();
+        waterfallContainer.appendChild(waterfallTickConditionElement);
+
+        // Remove the waterfallTickConditionElement after the animation ends
+        waterfallTickConditionElement.addEventListener('animationend', () => {
+            waterfallTickConditionElement.remove();
+        });
+
+        return waterfallTickConditionElement;
+    }
+    ////////////////////////////////////////////////
+    // TIMING STUFF
+    ////////////////////////////////////////////////
+
+    // Variables to store the start time and duration of the key press
+    let pressStartTime = null;
+    let pressDuration = 0;
+
+    // Function to start the key press timer
+    function startKeyPressTimer() {
+      pressStartTime = new Date();
+    }
+
+    // Function to stop the key press timer and calculate the duration
+    function stopKeyPressTimer() {
+      if (pressStartTime) {
+        const currentTime = new Date();
+        pressDuration = currentTime - pressStartTime;
+        pressStartTime = null;
+      }
+    }
+
+    let upStartTime = null;
+    let upDuration = 0;
+    function startKeyUpTimer() {
+      upStartTime = new Date();
+    }
+
+    function stopKeyUpTimer() {
+      if (upStartTime) {
+        const currentTime = new Date();
+        upDuration = currentTime - upStartTime;
+        upStartTime = null;
+      }
+    }
+
+    ////////////////////////////////////////////////
+    // ALGORITHM BY MYSELF OR CHATGPT
+    ////////////////////////////////////////////////
+
+    // Array to store the numbers
+    const numbers = [];
+    let morseCodes = '';
+    let thresholdLocked = false;
+    let midSep = 0; //Threshold of dash or dot
+
+    // Function to save the number into the array
+    function saveNumber(number) {
+      numbers.push(number);
+
+      if (numbers.length > 10) {
+        numbers.shift(); // Remove the oldest number if the array exceeds 10 elements
+        if (!thresholdLocked) {
+          morseCodes = '';
+          thresholdLocked = true;
+        }
+        updateThresholdLocked();
+      }
+
+      // console.log('Numbers:', numbers);
+    }
+
+    // Function to calculate the average of the upper and lower halves
+    function calculateAverage() {
+      const sortedNumbers = numbers.slice().sort((a, b) => a - b);
+      const halfLength = Math.floor(sortedNumbers.length / 2);
+
+      const lowerHalf = sortedNumbers.slice(0, halfLength);
+      const upperHalf = sortedNumbers.slice(-halfLength);
+
+      const lowerHalfAverage = calculateAverageFromArray(lowerHalf);
+      const upperHalfAverage = calculateAverageFromArray(upperHalf);
+
+      // console.log('Lower Half:', lowerHalf);
+      // console.log('Lower Half Average:', lowerHalfAverage);
+      updatePressTime(lowerHalfAverage, upperHalfAverage);
+      // console.log('Upper Half:', upperHalf);
+      // console.log('Upper Half Average:', upperHalfAverage);
+      updateRatio(lowerHalfAverage / upperHalfAverage);
+      updateGapRatio(upDuration / lowerHalfAverage * 100);
+      const waterfallTickConditionElement = addWaterfallTickConditionElement();
+      waterfallTickConditionElement.style.animationDuration = '8s';
+
+      if (!thresholdLocked) {
+        midSep = upperHalfAverage + lowerHalfAverage;
+      }
+      waterfallTickConditionElement.style.width = `${midSep / 8}px`;
+      if (upDuration / lowerHalfAverage * 100 > 300){
+        pushMorseRaw('/');
+      }
+      if (pressDuration>midSep / 2){
+        pushMorseRaw('-');
+      }
+      else{
+        pushMorseRaw('.');
+      }
+    }
+
+    // Function to calculate the average of an array
+    function calculateAverageFromArray(array) {
+      const sum = array.reduce((total, current) => total + current, 0);
+      return array.length > 0 ? sum / array.length : 0;
+    }
+
+    const morseCodeMap = {
+      '.-': 'A', '-...': 'B', '-.-.': 'C', '-..': 'D', '.': 'E',
+      '..-.': 'F', '--.': 'G', '....': 'H', '..': 'I', '.---': 'J',
+      '-.-': 'K', '.-..': 'L', '--': 'M', '-.': 'N', '---': 'O',
+      '.--.': 'P', '--.-': 'Q', '.-.': 'R', '...': 'S', '-': 'T',
+      '..-': 'U', '...-': 'V', '.--': 'W', '-..-': 'X', '-.--': 'Y',
+      '--..': 'Z', '.----': '1', '..---': '2', '...--': '3', '....-': '4',
+      '.....': '5', '-....': '6', '--...': '7', '---..': '8', '----.': '9',
+      '-----': '0', '': ' '
+    };
+    function pushMorseRaw(code) {
+      morseCodes += code;
+    }
+    function cleanBuffer() {
+      numbers.length = 0;
+      morseCodes = '';
+      thresholdLocked = false;
+      midSep = 0;
+      updateThresholdLocked();
+      decodeMorseCode();
+    }
+    function decodeMorseCode() {
+      if (thresholdLocked) {
+        console.log(morseCodes);
+        const decodedOutput = document.getElementById('decodedOutput');
+
+        const characters = morseCodes.split('/');
+        const decodedWord = characters
+          .map(character => morseCodeMap[character] || '?')
+          .join('');
+        decodedOutput.textContent = decodedWord;
+        return;
+      }
+    }
+
+
+    ////////////////////////////////////////////////
+    // UPDATE CSS
+    ////////////////////////////////////////////////
+
+    // Function to update the waterfall element's height
+    function updateWaterfallElementHeight(height) {
+      const waterfallElement = addWaterfallElement();
+      waterfallElement.style.animationDuration = '8s';
+      if (!isNormFall) {
+        waterfallElement.style.width = `${height/4}px`;
+      }
+      else {
+        waterfallElement.style.height = `${height/4}px`;
+      }
+    }
+
+    // Function to indicate thresholdLocked
+    function updateThresholdLocked() {
+      const lumpElement = document.getElementsByClassName('color-lump');
+      const threshold = document.getElementById('threshold');
+      if (thresholdLocked){
+        // lumpElement.style.backgroundColor = '#33CC66';
+        threshold.textContent = `${midSep}`;
+      }
+      else {
+        // lumpElement.style.backgroundColor = '#CC3300';
+        threshold.textContent = '0';
+      }
+
+    }
+
+    // Function to update the press duration display
+    function updatePressDurationDisplay(duration) {
+      const pressDurationElement = document.getElementById('pressDuration');
+      pressDurationElement.textContent = duration;
+    }
+    function updatePressTime(lower, upper) {
+      const pressDurationLong = document.getElementById('pressLong');
+      const pressDurationShort = document.getElementById('pressShort');
+      pressDurationLong.textContent = Math.floor(upper);
+      pressDurationShort.textContent = Math.floor(lower);
+    }
+    function updateRatio(ratio) {
+      const pressDurationElement = document.getElementById('ratio');
+      pressDurationElement.textContent = Math.floor(ratio * 100);
+    }
+    function updateGapRatio(value) {
+      const pressDurationElement = document.getElementById('gapRatio');
+      const pressTemp = document.getElementById('gapRatioTemp');
+      pressDurationElement.textContent = Math.floor(value);
+      if (value >= 170) {
+        pressTemp.textContent = Math.floor(value);
+      }
+    }
+    ////////////////////////////////////////////////
+    // LISTEN KEYS
+    ////////////////////////////////////////////////
+
+    // Event listener for key press
+    document.addEventListener('keydown', (event) => {
+      if (isKeyPressMode) {
+        if (!isKeyPressed) {
+          startOscillator();
+          startKeyPressTimer();
+          stopKeyUpTimer();
+          const waterfallGapElement = addWaterfallGapElement();
+          waterfallGapElement.style.animationDuration = '8s';
+          waterfallGapElement.style.height = `${upDuration}px`;
+        }
+        isKeyPressed = true;
+        // updatePressDurationDisplay(0);
+      }
+    });
+
+    // Event listener for key release
+    document.addEventListener('keyup', () => {
+      if (isKeyPressMode) {
+        stopOscillator();
+        stopKeyPressTimer();
+        isKeyPressed = false;
+        startKeyUpTimer();//
+        updatePressDurationDisplay(pressDuration); // Reset the press duration display
+        updateWaterfallElementHeight(pressDuration);
+        saveNumber(pressDuration);
+        calculateAverage();
+        setTimeout(function () {
+          decodeMorseCode();
+        }, 1000);
+      }
+    });
+
+    // Event listener for mouse click
+    document.addEventListener('mousedown', () => {
+      if (!isKeyPressMode) {
+        if (!isKeyPressed) {
+          startOscillator();
+          startKeyPressTimer();
+        }
+        isKeyPressed = true;
+        // updatePressDurationDisplay(0);
+      }
+    });
+
+    // Event listener for mouse release
+    document.addEventListener('mouseup', () => {
+      if (!isKeyPressMode) {
+        stopOscillator();
+        stopKeyPressTimer();
+        isKeyPressed = false;
+        updatePressDurationDisplay(pressDuration); // Reset the press duration display
+        updateWaterfallElementHeight(pressDuration);
+        saveNumber(pressDuration);
+        calculateAverage();
+      }
+    });
+
+    // // Event listener for cheat code input
+    // const cheatCodeInput = document.getElementById('cheatCodeInput');
+    // cheatCodeInput.addEventListener('keyup', (event) => {
+    //   if (event.key === 'Enter' && cheatCodeInput.value.toLowerCase() === 'cheat code') {
+    //     toggleMode();
+    //     cheatCodeInput.value = '';
+    //     cheatCodeInput.placeholder = `Mode switched. Current mode: ${isKeyPressMode ? 'Press Key' : 'Press Mouse'}`;
+    //   }
+    // });
+  </script>
+</body>
+</html>

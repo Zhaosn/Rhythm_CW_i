@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Variable Array Example</title>
+</head>
+<body>
+  <input type="number" id="numberInput">
+  <button onclick="saveNumber()">Save</button>
+  <button onclick="calculateAverage()">Calculate Average</button>
+
+  <script>
+    // Array to store the numbers
+    const numbers = [];
+
+    // Function to save the number into the array
+    function saveNumber() {
+      const numberInput = document.getElementById('numberInput');
+      const number = parseInt(numberInput.value);
+      numbers.push(number);
+
+      if (numbers.length > 10) {
+        numbers.shift(); // Remove the oldest number if the array exceeds 10 elements
+      }
+
+      numberInput.value = ''; // Clear the input field
+      console.log('Numbers:', numbers);
+    }
+
+    // Function to calculate the average of the upper and lower halves
+    function calculateAverage() {
+      const sortedNumbers = numbers.slice().sort((a, b) => a - b);
+      const halfLength = Math.floor(sortedNumbers.length / 2);
+
+      const lowerHalf = sortedNumbers.slice(0, halfLength);
+      const upperHalf = sortedNumbers.slice(-halfLength);
+
+      const lowerHalfAverage = calculateAverageFromArray(lowerHalf);
+      const upperHalfAverage = calculateAverageFromArray(upperHalf);
+
+      console.log('Lower Half:', lowerHalf);
+      console.log('Lower Half Average:', lowerHalfAverage);
+      console.log('Upper Half:', upperHalf);
+      console.log('Upper Half Average:', upperHalfAverage);
+    }
+
+    // Function to calculate the average of an array
+    function calculateAverageFromArray(array) {
+      const sum = array.reduce((total, current) => total + current, 0);
+      return array.length > 0 ? sum / array.length : 0;
+    }
+  </script>
+</body>
+</html>
