@@ -6,7 +6,7 @@
   <style>
     #waterfallContainer {
       position: relative;
-      width: 1500px;
+      width: 100%;
       height: 300px;
       border: 1px solid #ccc;
       overflow: hidden;
@@ -41,6 +41,10 @@
       width: 15px;
       height: 15px;
       background-color: #CC3300;
+    }
+    .text {
+      height: 60px;
+      overflow-y: auto;
     }
 
 /*    @keyframes waterfallAnimation {
@@ -81,7 +85,7 @@
   </style>
 </head>
 <body>
-  <h1>CW Trainer</h1>
+  <h1>RhythmCW!</h1>
   <p>Press and hold any key or click the mouse to play a 440Hz sine wave.</p>
 <!--  <p>Enter "cheat code" below to toggle between press key and press mouse:</p>
   <input type="text" id="cheatCodeInput" placeholder="Enter cheat code" />-->
@@ -93,27 +97,28 @@
   <p>划: <span id="pressLong">0</span>ms</p>
   <p>点: <span id="pressShort">0</span>ms</p>
   <p>点划比: <span id="ratio">0</span>%</p>
-  <p>间隔比点: <span id="gapRatio">0</span>%; 超过170%: <span id="gapRatioTemp">0</span>%</p>
+  <p>间隔比点: <span id="gapRatio">0</span>%; 分字间隔阈值: <span id="gapThres">0</span>ms</p>
   <p id="decodedOutput"></p>
   <div>
     点划判定点锁定
-    <span class="color-lump"></span>
+    <span id="color-lump">😼</span>
     <span id="threshold">0</span>ms
-    <button type="button" onclick="cleanBuffer()">清空解码</button>
+    <button type="button" onclick="cleanAll()">PurgeAll</button>
+    <button type="button" onclick="cleanDecodeText()">CleanLetter</button>
   </div>
   <div id="waterfallContainer"></div>
-  <p>'.-': 'A', '-...': 'B', '-.-.': 'C', '-..': 'D', '.': 'E',
+  <div class="text">'.-': 'A', '-...': 'B', '-.-.': 'C', '-..': 'D', '.': 'E',
       '..-.': 'F', '--.': 'G', '....': 'H', '..': 'I', '.---': 'J',
       '-.-': 'K', '.-..': 'L', '--': 'M', '-.': 'N', '---': 'O',
       '.--.': 'P', '--.-': 'Q', '.-.': 'R', '...': 'S', '-': 'T',
       '..-': 'U', '...-': 'V', '.--': 'W', '-..-': 'X', '-.--': 'Y',
       '--..': 'Z', '.----': '1', '..---': '2', '...--': '3', '....-': '4',
       '.....': '5', '-....': '6', '--...': '7', '---..': '8', '----.': '9',
-      '-----': '0'</br>
+      '-----': '0'</br>-.../..../...--/..-./--../.---</br>
       其实这个瀑布图一开始是想做竖着的，后来改成横向运动后没改元素的CSS，觉得这个效果挺新鲜就保留了。</br>时间长短是几次输入平均结果</br>怎么算出字之间的大间隔？</br>
   《业余无线电通信》(第四版)72页说小间隔是无间隔3个点，大间隔是5个</br>
   间隔我新增了一个竖条，现在需要想一个算法能将"最长的间隔后的信号"当作新的字母
-  </br>我的面向对象能力很差，代码模块化很低，有的变量前面声明后面到处调用：我将超时分割字符的功能没有和其他解码功能放在了一起，而是作为类似抬起按键后的看门狗放在了那里</p>
+  </br>我的面向对象能力很差，代码模块化很低，有的变量前面声明后面到处调用：我将超时分割字符的功能没有和其他解码功能放在了一起，而是作为类似抬起按键后的看门狗放在了那里</div>
   <script>
 
     ////////////////////////////////////////////////
@@ -333,13 +338,19 @@
       waterfallTickConditionElement.style.animationDuration = '8s';
 
       if (!thresholdLocked) {
-        midSep = upperHalfAverage + lowerHalfAverage;
+        midSep = (upperHalfAverage + lowerHalfAverage)/2;
       }
-      waterfallTickConditionElement.style.width = `${midSep / 8}px`;
-      if (upDuration / lowerHalfAverage * 100 > 300){
+      waterfallTickConditionElement.style.width = `${midSep / 4}px`;
+      if (upDuration / lowerHalfAverage * 100 > 300 || upDuration > 300){
         pushMorseRaw('/');
+        if (upDuration > 300) {
+          updateGapThres(300);
+        }
+        else {
+          updateGapThres(upDuration);
+        }
       }
-      if (pressDuration>midSep / 2){
+      if (pressDuration>midSep){
         pushMorseRaw('-');
       }
       else{
@@ -366,12 +377,18 @@
     function pushMorseRaw(code) {
       morseCodes += code;
     }
-    function cleanBuffer() {
+    function cleanAll() {
+      numbers.length = 0; //clean raw time data buffer
+      morseCodes = '';  //clean time to ".-" data buffer
+      thresholdLocked = false;  //restart calculate threshold
+      midSep = 0;   //restart calculate threshold
+      updateThresholdLocked();  //restart threshold display
+      decodeMorseCode();
+    }
+    function cleanDecodeText() {
       numbers.length = 0;
       morseCodes = '';
-      thresholdLocked = false;
-      midSep = 0;
-      updateThresholdLocked();
+
       decodeMorseCode();
     }
     function decodeMorseCode() {
@@ -407,14 +424,14 @@
 
     // Function to indicate thresholdLocked
     function updateThresholdLocked() {
-      const lumpElement = document.getElementsByClassName('color-lump');
+      const lumpElement = document.getElementById('color-lump');
       const threshold = document.getElementById('threshold');
       if (thresholdLocked){
-        // lumpElement.style.backgroundColor = '#33CC66';
+        lumpElement.textContent = '⭕';
         threshold.textContent = `${midSep}`;
       }
       else {
-        // lumpElement.style.backgroundColor = '#CC3300';
+        lumpElement.textContent = '❌';
         threshold.textContent = '0';
       }
 
@@ -437,11 +454,11 @@
     }
     function updateGapRatio(value) {
       const pressDurationElement = document.getElementById('gapRatio');
-      const pressTemp = document.getElementById('gapRatioTemp');
       pressDurationElement.textContent = Math.floor(value);
-      if (value >= 170) {
-        pressTemp.textContent = Math.floor(value);
-      }
+    }
+    function updateGapThres(value) {
+      const gapThres = document.getElementById('gapThres');
+      gapThres.textContent = Math.floor(value);
     }
     ////////////////////////////////////////////////
     // LISTEN KEYS
